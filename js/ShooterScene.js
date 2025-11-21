@@ -10,22 +10,95 @@ class ShooterScene extends Phaser.Scene {
     }
 
     create() {
-        this.cameras.main.setBackgroundColor('#4488aa'); 
+        // ... (背景色、物理组等代码保持不变) ...
+        this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
         const W = this.scale.width;
         const H = this.scale.height;
 
         this.currentWeapon = 'bow';
         this.isSpawning = false;
         
-        // 物理组
         this.bullets = this.physics.add.group(); 
         this.targets = this.physics.add.group();
-
         this.physics.world.setBounds(0, 0, W, H);
+
         this.createUI(W, H);
 
-        // 点击射击
-        this.input.on('pointerdown', (pointer) => this.fireWeapon(pointer, H), this);
+        // === 【新增】辅助线画笔 ===
+        this.trajectoryGraphics = this.add.graphics().setDepth(20);
+
+        // === 【修改】输入事件：改为拖拽瞄准 ===
+        this.isAiming = false; // 标记是否正在瞄准
+        
+        // 1. 按下：开始瞄准
+        this.input.on('pointerdown', (pointer) => {
+            // 排除点击顶部UI区域
+            if (pointer.y < 150 || pointer.y > H - 80) return;
+            this.isAiming = true;
+        });
+
+        // 2. 移动：更新辅助线
+        this.input.on('pointermove', (pointer) => {
+            if (this.isAiming) {
+                this.drawTrajectory(pointer);
+            }
+        });
+
+        // 3. 松开：发射！
+        this.input.on('pointerup', (pointer) => {
+            if (this.isAiming) {
+                this.isAiming = false;
+                this.trajectoryGraphics.clear(); // 清除辅助线
+                this.fireWeapon(pointer); // 发射
+            }
+        });
+    }
+
+    // --- 新增：绘制弹道辅助线 ---
+    drawTrajectory(pointer) {
+        this.trajectoryGraphics.clear();
+        this.trajectoryGraphics.lineStyle(2, 0xffffff, 0.5); // 白色虚线
+
+        // 起点 (也就是子弹发射的位置)
+        const startX = 150;
+        const startY = this.scale.height - 150;
+
+        // 获取当前武器的参数
+        const stats = this.getWeaponStats();
+        
+        // 计算发射角度和速度向量
+        // 注意：弓箭和袜子有重力，枪是直线
+        const angle = Phaser.Math.Angle.Between(startX, startY, pointer.x, pointer.y);
+        const velocityX = Math.cos(angle) * stats.speed;
+        const velocityY = Math.sin(angle) * stats.speed;
+        const gravity = stats.gravity; // 我们需要在 getWeaponStats 里定义重力
+
+        // 模拟物理路径：绘制 30 个点
+        this.trajectoryGraphics.beginPath();
+        this.trajectoryGraphics.moveTo(startX, startY);
+
+        // 模拟未来 1秒内的路径 (时间步长 0.03秒)
+        for (let t = 0; t <= 1.5; t += 0.03) {
+            // 物理公式：位移 = 速度*时间 + 0.5*加速度*时间^2
+            let dx = startX + velocityX * t;
+            let dy = startY + velocityY * t + 0.5 * gravity * t * t;
+            
+            this.trajectoryGraphics.lineTo(dx, dy);
+            
+            // 如果碰到地面就停止绘制
+            if (dy > this.scale.height || dx > this.scale.width) break;
+        }
+        this.trajectoryGraphics.strokePath();
+    }
+
+    // --- 抽取武器参数配置 (方便复用) ---
+    getWeaponStats() {
+        // 袜子 (sock) 替代了原来的鞋子
+        return {
+            'bow':  { speed: 700,  gravity: 200, size: 1.0, color: 0xffffff, maxHits: 1 },
+            'gun':  { speed: 1200, gravity: 0,   size: 1.5, color: 0xaaaaaa, maxHits: 1 },
+            'sock': { speed: 1000, gravity: 400, size: 2.5, color: 0xffaabb, maxHits: 99 } // 袜子重力大，抛物线明显
+        }[this.currentWeapon];
     }
 
     createUI(W, H) {
@@ -60,11 +133,11 @@ class ShooterScene extends Phaser.Scene {
         let startX = W - 350; 
         this.createShopItem(startX, 20, 'bow', 10, 10, '买弓');
         this.createShopItem(startX + 110, 20, 'gun', 10, 5, '买枪');
-        this.createShopItem(startX + 220, 20, 'shoe', 10, 3, '买鞋');
+        this.createShopItem(startX + 220, 20, 'sock', 10, 3, '买袜');
 
         this.createSwitchBtn(startX, 70, 'bow', '装备:弓');
         this.createSwitchBtn(startX + 110, 70, 'gun', '装备:枪');
-        this.createSwitchBtn(startX + 220, 70, 'shoe', '装备:鞋');
+        this.createSwitchBtn(startX + 220, 70, 'sock', '装备:袜');
 
         // --- 6. 底部召唤按钮 (保持不变) ---
         this.spawnBtn = this.add.text(W / 2, H - 80, ' 召唤猎物 (-10金币) ', { 
@@ -159,7 +232,7 @@ class ShooterScene extends Phaser.Scene {
             `📦 库存:\n` +
             `   🏹 弓箭: ${d.ammo.bow}\n` +
             `   🔫 枪弹: ${d.ammo.gun}\n` +
-            `   👟 飞鞋: ${d.ammo.shoe}`
+            `   👟 臭袜: ${d.ammo.sock}`
         );
 
         // 刷新商店按钮的状态（可选）
@@ -170,7 +243,7 @@ class ShooterScene extends Phaser.Scene {
     }
 
     getWeaponName(key) {
-        const map = { 'bow': '弓', 'gun': '枪', 'shoe': '鞋' };
+        const map = { 'bow': '弓', 'gun': '枪',  'sock': '臭袜' };
         return map[key];
     }
 
@@ -269,44 +342,63 @@ class ShooterScene extends Phaser.Scene {
     }
 
     // --- 射击逻辑 (含 V1.2 连击准备) ---
-    fireWeapon(pointer, screenHeight) {
-        if (pointer.y < 120 || pointer.y > screenHeight - 120) return;
-
+    fireWeapon(pointer) {
+        // 检查弹药
         if (DataManager.data.ammo[this.currentWeapon] <= 0) {
-            this.showToast("弹药不足");
+            this.showToast("弹药不足! 请购买");
             return;
         }
 
+        // 扣弹药
         DataManager.data.ammo[this.currentWeapon]--;
         DataManager.save();
         this.updateUI();
 
-        let stats = {
-            'bow':  { speed: 700,  size: 1.0, color: 0xffffff, maxHits: 1 },  // 弓箭：单体
-            'gun':  { speed: 1200, size: 1.5, color: 0xaaaaaa, maxHits: 1 },  // 枪：单体
-            'shoe': { speed: 1500, size: 3.0, color: 0xff00ff, maxHits: 99 }  // 鞋：无限穿透！
-        }[this.currentWeapon];
+        // 获取参数
+        const stats = this.getWeaponStats();
+        const startX = 150;
+        const startY = this.scale.height - 150;
 
-        let bullet = this.add.rectangle(150, this.scale.height - 150, 20 * stats.size, 10 * stats.size, stats.color);
+        // 生成子弹
+        // 袜子的颜色设个粉色或者贴图
+        let bullet = this.add.rectangle(startX, startY, 20 * stats.size, 10 * stats.size, stats.color);
+        
+        // 如果是袜子，我们可以搞个简单的“旋转动画”模拟袜子在飞
+        if (this.currentWeapon === 'sock') {
+            // 把矩形变得稍微不规则一点，像个袜子
+            bullet.setSize(30, 15); 
+        }
+
         this.physics.add.existing(bullet);
         this.bullets.add(bullet);
 
-        // --- 关键：绑定穿透属性 ---
-        bullet.maxHits = stats.maxHits; 
-        bullet.hitCount = 0; // 当前已命中次数
-        bullet.hitTargetIds = new Set(); // 记录命中过的物体，防止同一发子弹对同一个物体触发多次伤害
+        // 设置子弹属性
+        bullet.maxHits = stats.maxHits;
+        bullet.hitCount = 0;
+        bullet.hitTargetIds = new Set();
 
-        if (this.currentWeapon === 'gun') {
-            bullet.body.allowGravity = false;
-            this.physics.moveTo(bullet, pointer.x, pointer.y, stats.speed);
+        // --- 核心：根据角度设置速度 ---
+        const angle = Phaser.Math.Angle.Between(startX, startY, pointer.x, pointer.y);
+        
+        // 设置重力
+        bullet.body.setGravityY(stats.gravity);
+        
+        // 设置速度向量 (这样和我们的辅助线算法就完全一致了)
+        bullet.body.setVelocity(
+            Math.cos(angle) * stats.speed,
+            Math.sin(angle) * stats.speed
+        );
+
+        // 旋转效果
+        if (this.currentWeapon === 'sock') {
+            // 袜子疯狂旋转
+            this.tweens.add({ targets: bullet, angle: 360, duration: 300, repeat: -1 });
         } else {
-            bullet.body.setGravityY(this.currentWeapon === 'shoe' ? 400 : 200);
-            this.physics.moveTo(bullet, pointer.x, pointer.y, stats.speed);
-            if (this.currentWeapon === 'shoe') {
-                this.tweens.add({ targets: bullet, angle: 360, duration: 200, repeat: -1 });
-            } else {
-                bullet.rotation = Phaser.Math.Angle.Between(150, this.scale.height - 150, pointer.x, pointer.y);
-            }
+            // 弓箭和枪随速度方向旋转
+            bullet.rotation = angle;
+            // 让弓箭在飞行中头部自动对准轨迹 (Arcade Physics 的小技巧)
+            bullet.body.onWorldBounds = true; // 开启边界检测(可选)
+            // 简单的随速度旋转逻辑在 update 中写比较好，这里简化处理，只设置初始角度
         }
 
         this.physics.add.overlap(bullet, this.targets, this.handleHit, null, this);
