@@ -1,21 +1,36 @@
+// 获取当前窗口的宽高比
+const windowWidth = window.innerWidth;
+const windowHeight = window.innerHeight;
+const ratio = windowHeight / windowWidth;
+
+// 设定固定的逻辑宽度
+const gameWidth = 1280;
+// 根据屏幕比例，动态计算需要的高度，确保占满垂直屏幕
+const gameHeight = Math.ceil(gameWidth * ratio);
+
 const config = {
     type: Phaser.AUTO,
-    // 1. 设定适配移动端的高清分辨率 (16:9)
     scale: {
-        mode: Phaser.Scale.FIT,              // 自动缩放模式：适应屏幕
-        autoCenter: Phaser.Scale.CENTER_BOTH, // 自动居中
-        width: 1280,                         // 逻辑宽度
-        height: 720,                         // 逻辑高度
-        orientation: Phaser.Scale.Orientation.LANDSCAPE // 建议强制横屏 (部分浏览器支持)
+        // 依然使用 FIT 模式，保证内容不被裁切
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        
+        // 【核心修改】
+        // 宽度固定 1280，保护你的横向布局
+        width: gameWidth, 
+        // 高度动态计算，确保 FIT 模式下正好撑满上下，没有黑边
+        height: gameHeight, 
+        
+        orientation: Phaser.Scale.Orientation.LANDSCAPE
     },
-    // backgroundColor: '#2d2d2d',
-    transparent: true, 
+    // 背景全黑
+    backgroundColor: '#000000', 
     parent: 'game-container',
     physics: {
         default: 'arcade',
         arcade: {
             gravity: { y: 0 },
-            debug: true // 手机上建议关闭 debug 提升性能
+            debug: false 
         }
     },
     scene: [CityScene, ShooterScene]

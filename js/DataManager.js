@@ -1,6 +1,6 @@
 window.DataManager = {
     defaultData: {
-        coins: 1000, // 初始资金 (不够买村庄，逼迫玩家先去射击)
+        coins: 100, // 初始资金 (不够买村庄，逼迫玩家先去射击)
         ammo: { bow: 50, gun: 0, sock: 0  }, 
         
         // 改为3个城市，默认全部未解锁 (需购买)

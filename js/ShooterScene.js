@@ -25,6 +25,19 @@ class ShooterScene extends Phaser.Scene {
         this.load.image('weapon_sock', 'assets/sock.png'); // 手拿袜子的图片
     }
 
+    update(time, delta) {
+        // 遍历所有子弹，更新它们的旋转角度
+        this.bullets.children.each(b => {
+            if (b.active) {
+                // 如果是弓箭 (没有旋转动画的)，让它根据当前飞行速度方向旋转
+                // 这样弓箭上升时箭头朝上，下落时箭头会自动朝下
+                if (this.currentWeapon !== 'sock') { 
+                    b.rotation = b.body.velocity.angle();
+                }
+            }
+        });
+    }
+
     create() {
 
         // 1. 获取屏幕宽带
@@ -51,7 +64,7 @@ class ShooterScene extends Phaser.Scene {
 
         // 1. 定义发射点坐标 (保存到 this 变量，方便后面发射子弹时调用)
         this.fireX = 150;
-        this.fireY = this.scale.height - 150;
+        this.fireY = this.scale.height - 300;
 
         // 2. === 【新增】创建武器精灵 ===
         // 默认先显示弓 (weapon_bow)
@@ -114,7 +127,7 @@ class ShooterScene extends Phaser.Scene {
         });
     }
 
-
+   
     // === 新增：更新主角手里的武器贴图 ===
     // === 修改后的 updatePlayerWeapon 方法 ===
     updatePlayerWeapon() {
@@ -178,12 +191,34 @@ class ShooterScene extends Phaser.Scene {
     }
 
     // --- 抽取武器参数配置 (方便复用) ---
+    // --- 抽取武器参数配置 (方便复用) ---
     getWeaponStats() {
-        // 袜子 (sock) 替代了原来的鞋子
         return {
-            'bow': { speed: 700, gravity: 200, size: 0.1, color: 0xffffff, maxHits: 1 },
-            'gun': { speed: 1200, gravity: 0, size: 0.15, color: 0xaaaaaa, maxHits: 1 },
-            'sock': { speed: 1000, gravity: 400, size: 0.25, color: 0xffaabb, maxHits: 99 } // 袜子重力大，抛物线明显
+            'bow': { 
+                // 修改1：速度从 700 提高到 1200 (动力更足)
+                // 修改2：重力从 200 降低到 150 (抛物线更平缓，能飞更远)
+                speed: 1200, 
+                gravity: 150, 
+                size: 0.1, 
+                color: 0xffffff, 
+                maxHits: 1 
+            },
+            'gun': { 
+                // 枪本身就没有重力，如果嫌慢也可以加度
+                speed: 1500, // 原来是 1200
+                gravity: 0, 
+                size: 0.15, 
+                color: 0xaaaaaa, 
+                maxHits: 1 
+            },
+            'sock': { 
+                // 袜子比较重，所以速度要给大一点
+                speed: 1300, // 原来是 1000
+                gravity: 350, // 原来是 400，稍微减轻一点重力
+                size: 0.25, 
+                color: 0xffaabb, 
+                maxHits: 99 
+            }
         }[this.currentWeapon];
     }
 

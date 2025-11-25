@@ -2,7 +2,7 @@
  * @Author: zhouming 1228124966@qq.com
  * @Date: 2025-11-21 17:15:04
  * @LastEditors: zhouming 1228124966@qq.com
- * @LastEditTime: 2025-11-25 10:22:40
+ * @LastEditTime: 2025-11-25 14:57:18
  * @Description: 
  * Copyright (c) 2025-present HBIS Digital Technology Co.,Ltd. All rights reserved.
 -->
@@ -19,25 +19,21 @@
 <head>
     <meta charset="UTF-8">
     <!-- 关键：禁止缩放，适配移动端视口 -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0,  viewport-fit=cover">
     <title>穿越时空的打工人</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden; /* 禁止滚动条 */
-            /* Flex 布局保证 Canvas 居中 */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            /* 禁止长按选中文字/图片 */
-            -webkit-user-select: none;
-            user-select: none;
-            -webkit-touch-callout: none;
-        }
+        body, html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #000;
+        overflow: hidden;
+    }
+    #game-container {
+        width: 100%;
+        height: 100%;
+    }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 </head>
