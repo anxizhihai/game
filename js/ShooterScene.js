@@ -12,7 +12,7 @@ class ShooterScene extends Phaser.Scene {
         this.load.image('plane', 'assets/Ship6.png');       // 飞机
         // this.load.image('bomb', 'assets/bomb.png');         // 炸弹
         // this.load.image('ammo_box', 'assets/ammo_box.png'); // 弹药箱
-        // this.load.image('bird', 'assets/bird.png');         // 鸟
+        this.load.image('bird', 'assets/bird.png');         // 鸟
 
         // === 2. 发射出的样子 ===
         this.load.image('bullet_bow', 'assets/arrow.png');  // 弓箭图片
