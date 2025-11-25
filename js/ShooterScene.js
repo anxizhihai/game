@@ -7,6 +7,16 @@ class ShooterScene extends Phaser.Scene {
     preload() {
         // 在此加载图片素材
         // this.load.image('bomb', 'assets/bomb.png'); 
+
+        this.load.image('plane', 'assets/Ship6.png');       // 飞机
+        // this.load.image('bomb', 'assets/bomb.png');         // 炸弹
+        // this.load.image('ammo_box', 'assets/ammo_box.png'); // 弹药箱
+        // this.load.image('bird', 'assets/bird.png');         // 鸟
+
+        // === 2. 加载子弹/武器图片 ===
+        this.load.image('bullet_bow', 'assets/arrow.png');  // 弓箭图片
+        // this.load.image('bullet_gun', 'assets/bullet.png'); // 子弹图片
+        // this.load.image('bullet_sock', 'assets/sock.png');  // 袜子图片
     }
 
     create() {
@@ -95,9 +105,9 @@ class ShooterScene extends Phaser.Scene {
     getWeaponStats() {
         // 袜子 (sock) 替代了原来的鞋子
         return {
-            'bow':  { speed: 700,  gravity: 200, size: 1.0, color: 0xffffff, maxHits: 1 },
-            'gun':  { speed: 1200, gravity: 0,   size: 1.5, color: 0xaaaaaa, maxHits: 1 },
-            'sock': { speed: 1000, gravity: 400, size: 2.5, color: 0xffaabb, maxHits: 99 } // 袜子重力大，抛物线明显
+            'bow':  { speed: 700,  gravity: 200, size: 0.1, color: 0xffffff, maxHits: 1 },
+            'gun':  { speed: 1200, gravity: 0,   size: 0.15, color: 0xaaaaaa, maxHits: 1 },
+            'sock': { speed: 1000, gravity: 400, size: 0.25, color: 0xffaabb, maxHits: 99 } // 袜子重力大，抛物线明显
         }[this.currentWeapon];
     }
 
@@ -314,6 +324,7 @@ class ShooterScene extends Phaser.Scene {
         
         if (this.textures.exists(type)) {
             target = this.physics.add.sprite(W + 50, y, type);
+            target.setScale(config.scale); 
         } else {
             // --- 修正纯图形的物理生成 ---
             if (type === 'bomb') {
@@ -359,17 +370,38 @@ class ShooterScene extends Phaser.Scene {
         const startX = 150;
         const startY = this.scale.height - 150;
 
-        // 生成子弹
-        // 袜子的颜色设个粉色或者贴图
-        let bullet = this.add.rectangle(startX, startY, 20 * stats.size, 10 * stats.size, stats.color);
+        // // 生成子弹
+        // // 袜子的颜色设个粉色或者贴图
+        // let bullet = this.add.rectangle(startX, startY, 20 * stats.size, 10 * stats.size, stats.color);
         
-        // 如果是袜子，我们可以搞个简单的“旋转动画”模拟袜子在飞
-        if (this.currentWeapon === 'sock') {
-            // 把矩形变得稍微不规则一点，像个袜子
-            bullet.setSize(30, 15); 
-        }
+        // // 如果是袜子，我们可以搞个简单的“旋转动画”模拟袜子在飞
+        // if (this.currentWeapon === 'sock') {
+        //     // 把矩形变得稍微不规则一点，像个袜子
+        //     bullet.setSize(30, 15); 
+        // }
 
+        // this.physics.add.existing(bullet);
+
+        let bullet;
+    
+    // 定义不同武器对应的图片 Key (要和 preload 里加载的一致)
+    const textureMap = {
+        'bow': 'bullet_bow',
+        'gun': 'bullet_gun',
+        'sock': 'bullet_sock'
+    };
+    const imgKey = textureMap[this.currentWeapon];
+
+    // 检查是否加载了图片
+    if (this.textures.exists(imgKey)) {
+        // 使用图片
+        bullet = this.physics.add.sprite(startX, startY, imgKey);
+        bullet.setScale(stats.size); // 使用 stats 里的 size 控制图片缩放
+    } else {
+        // 如果没图片，还是用原来的方块代替（作为后备）
+        bullet = this.add.rectangle(startX, startY, 20 * stats.size, 10 * stats.size, stats.color);
         this.physics.add.existing(bullet);
+    }
         this.bullets.add(bullet);
 
         // 设置子弹属性
