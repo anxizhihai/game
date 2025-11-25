@@ -10,8 +10,8 @@ class ShooterScene extends Phaser.Scene {
         // this.load.image('bomb', 'assets/bomb.png'); 
 
         this.load.image('plane', 'assets/Ship6.png');       // 飞机
-        // this.load.image('bomb', 'assets/bomb.png');         // 炸弹
-        // this.load.image('ammo_box', 'assets/ammo_box.png'); // 弹药箱
+        this.load.image('bomb', 'assets/bomb.png');         // 炸弹
+        this.load.image('ammo_box', 'assets/ammo_box.png'); // 弹药箱
         this.load.image('bird', 'assets/bird.png');         // 鸟
 
         // === 2. 发射出的样子 ===
@@ -437,9 +437,9 @@ class ShooterScene extends Phaser.Scene {
 
         let config = {
             'plane': { yMin: 0.1, yMax: 0.2, scale: 0.6, speed: 300, color: 0xffff00 },
-            'bomb': { yMin: 0.2, yMax: 0.7, scale: 0.9, speed: 150, color: 0x000000 },
-            'ammo_box': { yMin: 0.3, yMax: 0.5, scale: 0.8, speed: 150, color: 0x00ffff },
-            'bird': { yMin: 0.5, yMax: 0.8, scale: 1.0, speed: 100, color: 0xff0000 }
+            'bomb': { yMin: 0.2, yMax: 0.7, scale: 0.25, speed: 150, color: 0x000000 },
+            'ammo_box': { yMin: 0.3, yMax: 0.5, scale: 0.25, speed: 150, color: 0x00ffff },
+            'bird': { yMin: 0.5, yMax: 0.8, scale: 0.25, speed: 100, color: 0xff0000 }
         }[type];
 
         let y = Phaser.Math.Between(H * config.yMin, H * config.yMax);
