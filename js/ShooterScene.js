@@ -6,6 +6,7 @@ class ShooterScene extends Phaser.Scene {
 
     preload() {
         // 在此加载图片素材
+        this.load.image('bg_img', 'assets/background.png');
         // this.load.image('bomb', 'assets/bomb.png'); 
 
         this.load.image('plane', 'assets/Ship6.png');       // 飞机
@@ -13,22 +14,64 @@ class ShooterScene extends Phaser.Scene {
         // this.load.image('ammo_box', 'assets/ammo_box.png'); // 弹药箱
         // this.load.image('bird', 'assets/bird.png');         // 鸟
 
-        // === 2. 加载子弹/武器图片 ===
+        // === 2. 发射出的样子 ===
         this.load.image('bullet_bow', 'assets/arrow.png');  // 弓箭图片
-        // this.load.image('bullet_gun', 'assets/bullet.png'); // 子弹图片
-        // this.load.image('bullet_sock', 'assets/sock.png');  // 袜子图片
+        this.load.image('bullet_gun', 'assets/gun.jpg'); // 子弹图片
+        this.load.image('bullet_sock', 'assets/sock.png');  // 袜子图片
+
+        // 发射的基座
+        this.load.image('weapon_bow', 'assets/bow.png');  // 弓的图片
+        this.load.image('weapon_gun', 'assets/gun.jpg');  // 枪的图片
+        this.load.image('weapon_sock', 'assets/sock.png'); // 手拿袜子的图片
     }
 
     create() {
-        // ... (背景色、物理组等代码保持不变) ...
-        this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
+
+        // 1. 获取屏幕宽带
         const W = this.scale.width;
         const H = this.scale.height;
 
+        // === 【新增】添加背景图 ===
+        // 参数说明：x坐标, y坐标, 图片Key
+        let bg = this.add.image(W / 2, H / 2, 'bg_img');
+
+        // 关键设置：
+        // 1. 铺满屏幕：强制把图片拉伸到和屏幕一样大
+        bg.setDisplaySize(W, H);
+
+        // 2. 层级调整：设置为 -1，确保它永远在所有物体(默认是0)的后面
+        bg.setDepth(-1);
+
+        // ... (背景色、物理组等代码保持不变) ...
+        this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
+        // const W = this.scale.width;
+        // const H = this.scale.height;
+
+
+
+        // 1. 定义发射点坐标 (保存到 this 变量，方便后面发射子弹时调用)
+        this.fireX = 150;
+        this.fireY = this.scale.height - 150;
+
+        // 2. === 【新增】创建武器精灵 ===
+        // 默认先显示弓 (weapon_bow)
+        this.weaponSprite = this.add.sprite(this.fireX, this.fireY, 'weapon_bow');
+
+        this.weaponSprite.setDepth(15); // 层级要在背景之上，UI之下
+        // this.weaponSprite.setScale(0.5); // 如果图片太大，这里缩小一点
+
+         // 【关键】设置旋转中心点
+         this.weaponSprite.setOrigin(0, 0.5);
+
+
         this.currentWeapon = 'bow';
+
+          // === 【新增】初始化时立即调用一次更新函数 ===
+         // 这样它会立刻去读取配置里的 0.15 缩放比例，确保大小正确
+         this.updatePlayerWeapon();
         this.isSpawning = false;
-        
-        this.bullets = this.physics.add.group(); 
+
+        this.bullets = this.physics.add.group();
         this.targets = this.physics.add.group();
         this.physics.world.setBounds(0, 0, W, H);
 
@@ -39,7 +82,7 @@ class ShooterScene extends Phaser.Scene {
 
         // === 【修改】输入事件：改为拖拽瞄准 ===
         this.isAiming = false; // 标记是否正在瞄准
-        
+
         // 1. 按下：开始瞄准
         this.input.on('pointerdown', (pointer) => {
             // 排除点击顶部UI区域
@@ -51,6 +94,13 @@ class ShooterScene extends Phaser.Scene {
         this.input.on('pointermove', (pointer) => {
             if (this.isAiming) {
                 this.drawTrajectory(pointer);
+
+                // === 【新增】计算角度并旋转武器 ===
+                // 计算从 发射点(this.fireX, this.fireY) 到 鼠标位置(pointer.x, pointer.y) 的角度
+                let angle = Phaser.Math.Angle.Between(this.fireX, this.fireY, pointer.x, pointer.y);
+
+                // 设置武器旋转 (Phaser使用的是弧度，rotation属性接收弧度)
+                this.weaponSprite.rotation = angle;
             }
         });
 
@@ -64,18 +114,44 @@ class ShooterScene extends Phaser.Scene {
         });
     }
 
+
+    // === 新增：更新主角手里的武器贴图 ===
+    // === 修改后的 updatePlayerWeapon 方法 ===
+    updatePlayerWeapon() {
+        // 这里配置每种武器对应的【图片Key】和【缩放比例】
+        // 数值越小图片越小 (0.1 是原图的 10%, 1.0 是原图的 100%)
+        const config = {
+            'bow':  { key: 'weapon_bow',  scale: 0.15 },  // 弓箭一般比较大，缩小多一点
+            'gun':  { key: 'weapon_gun',  scale: 0.15 }, // 枪可能更细长
+            'sock': { key: 'weapon_sock', scale: 0.2 }   // 袜子图片大小不一，看着调
+        }[this.currentWeapon];
+        
+        // 检查图片是否存在
+        if (this.textures.exists(config.key)) {
+            this.weaponSprite.setTexture(config.key); // 换图
+            this.weaponSprite.setScale(config.scale); // 换大小 (关键!)
+            
+            // 【可选】微调位置偏移
+            // 如果发现有的武器握持位置不对，可以在这里重置一下原点
+            this.weaponSprite.setOrigin(0, 0.5); 
+        }
+    }
+
     // --- 新增：绘制弹道辅助线 ---
     drawTrajectory(pointer) {
         this.trajectoryGraphics.clear();
         this.trajectoryGraphics.lineStyle(2, 0xffffff, 0.5); // 白色虚线
 
         // 起点 (也就是子弹发射的位置)
-        const startX = 150;
-        const startY = this.scale.height - 150;
+        // const startX = 150;
+        // const startY = this.scale.height - 150;
+
+        const startX = this.fireX;
+        const startY = this.fireY;
 
         // 获取当前武器的参数
         const stats = this.getWeaponStats();
-        
+
         // 计算发射角度和速度向量
         // 注意：弓箭和袜子有重力，枪是直线
         const angle = Phaser.Math.Angle.Between(startX, startY, pointer.x, pointer.y);
@@ -92,9 +168,9 @@ class ShooterScene extends Phaser.Scene {
             // 物理公式：位移 = 速度*时间 + 0.5*加速度*时间^2
             let dx = startX + velocityX * t;
             let dy = startY + velocityY * t + 0.5 * gravity * t * t;
-            
+
             this.trajectoryGraphics.lineTo(dx, dy);
-            
+
             // 如果碰到地面就停止绘制
             if (dy > this.scale.height || dx > this.scale.width) break;
         }
@@ -105,19 +181,19 @@ class ShooterScene extends Phaser.Scene {
     getWeaponStats() {
         // 袜子 (sock) 替代了原来的鞋子
         return {
-            'bow':  { speed: 700,  gravity: 200, size: 0.1, color: 0xffffff, maxHits: 1 },
-            'gun':  { speed: 1200, gravity: 0,   size: 0.15, color: 0xaaaaaa, maxHits: 1 },
+            'bow': { speed: 700, gravity: 200, size: 0.1, color: 0xffffff, maxHits: 1 },
+            'gun': { speed: 1200, gravity: 0, size: 0.15, color: 0xaaaaaa, maxHits: 1 },
             'sock': { speed: 1000, gravity: 400, size: 0.25, color: 0xffaabb, maxHits: 99 } // 袜子重力大，抛物线明显
         }[this.currentWeapon];
     }
 
     createUI(W, H) {
         // --- 1. 初始化容器 (保持不变) ---
-        this.switchBtns = {}; 
+        this.switchBtns = {};
 
         // --- 2. 顶部黑色背景条 (保持不变) ---
         this.add.rectangle(W / 2, 50, W, 100, 0x000000).setAlpha(0.8).setDepth(10);
-        
+
         // --- 3. 回城按钮 (保持不变) ---
         this.createBtn(80, 50, ' < 回城 ', '#555', () => this.scene.start('CityScene'));
 
@@ -127,20 +203,36 @@ class ShooterScene extends Phaser.Scene {
 
         // === 【新增】常驻的加金币按钮 ===
         // 放在顶部，稍微靠右一点的位置
-        this.addCoinBtn = this.add.text(350, 30, ' 📺免费金币 ', { 
-            fontSize: '20px', 
+        this.addCoinBtn = this.add.text(350, 30, ' 📺免费金币 ', {
+            fontSize: '20px',
             backgroundColor: '#aa0000', // 红色醒目一点
             padding: { x: 10, y: 5 },
             color: '#fff',
             fontStyle: 'bold'
         })
-        .setOrigin(0, 0) // 左上角对齐
-        .setDepth(11)
-        .setInteractive()
-        .on('pointerdown', () => this.watchAd()); // 点击触发看广告
+            .setOrigin(0, 0) // 左上角对齐
+            .setDepth(11)
+            .setInteractive()
+            .on('pointerdown', () => this.watchAd()); // 点击触发看广告
+
+
+        // === 【修改】召唤按钮：移到顶部，放在免费金币右边 ===
+        // 既然金币按钮在 350，我们把召唤按钮放在 490 左右 (避免重叠)
+        // 字体改小到 20px (原来是 36px)，防止挡住画面
+        this.spawnBtn = this.add.text(490, 30, ' ⚡召唤(-10) ', {
+            fontSize: '20px',
+            backgroundColor: '#00aa00',
+            padding: { x: 10, y: 5 },
+            fontStyle: 'bold',
+            color: '#fff'
+        })
+            .setOrigin(0, 0) // 左上角对齐，和金币按钮保持一致
+            .setInteractive()
+            .setDepth(11)
+            .on('pointerdown', () => this.startWave());
 
         // --- 5. 商店与切换按钮 (保持不变) ---
-        let startX = W - 350; 
+        let startX = W - 350;
         this.createShopItem(startX, 20, 'bow', 10, 10, '买弓');
         this.createShopItem(startX + 110, 20, 'gun', 10, 5, '买枪');
         this.createShopItem(startX + 220, 20, 'sock', 10, 3, '买袜');
@@ -150,11 +242,11 @@ class ShooterScene extends Phaser.Scene {
         this.createSwitchBtn(startX + 220, 70, 'sock', '装备:袜');
 
         // --- 6. 底部召唤按钮 (保持不变) ---
-        this.spawnBtn = this.add.text(W / 2, H - 80, ' 召唤猎物 (-10金币) ', { 
-            fontSize: '36px', backgroundColor: '#00aa00', padding: { x: 30, y: 20 }, fontStyle: 'bold'
-        })
-        .setOrigin(0.5).setInteractive().setDepth(10)
-        .on('pointerdown', () => this.startWave());
+        // this.spawnBtn = this.add.text(W / 2, H - 80, ' 召唤猎物 (-10金币) ', { 
+        //     fontSize: '36px', backgroundColor: '#00aa00', padding: { x: 30, y: 20 }, fontStyle: 'bold'
+        // })
+        // .setOrigin(0.5).setInteractive().setDepth(10)
+        // .on('pointerdown', () => this.startWave());
 
         // === 【删除】原来的 this.adBtn 相关代码全部删掉 ===
         // (把原来 W/2, H/2 那个红色大按钮删掉)
@@ -169,7 +261,7 @@ class ShooterScene extends Phaser.Scene {
     }
 
     createShopItem(x, y, weaponKey, cost, amount, label) {
-        this.add.text(x, y, `${label}\n$${cost}`, { 
+        this.add.text(x, y, `${label}\n$${cost}`, {
             fontSize: '18px', backgroundColor: '#333', align: 'center', padding: { x: 10, y: 5 }
         }).setDepth(11).setInteractive().on('pointerdown', () => {
             if (DataManager.spendCoins(cost)) {
@@ -207,18 +299,20 @@ class ShooterScene extends Phaser.Scene {
 
     createSwitchBtn(x, y, weaponKey, label) {
         // 1. 创建文字按钮
-        let btn = this.add.text(x, y, label, { 
-            fontSize: '18px', 
+        let btn = this.add.text(x, y, label, {
+            fontSize: '18px',
             backgroundColor: '#555', // 默认灰色
-            padding: { x: 10, y: 5 } 
+            padding: { x: 10, y: 5 }
         })
-        .setDepth(11)
-        .setInteractive();
+            .setDepth(11)
+            .setInteractive();
 
         // 2. 添加点击事件
         btn.on('pointerdown', () => {
             this.currentWeapon = weaponKey; // 改变当前武器
             this.updateUI(); // 刷新界面(这会触发颜色的更新)
+
+            this.updatePlayerWeapon();
             console.log("切换武器为:", weaponKey); // 方便调试
         });
 
@@ -230,14 +324,14 @@ class ShooterScene extends Phaser.Scene {
     // --- 替换原有的 updateUI 方法 ---
     updateUI() {
         const d = DataManager.data;
-        
+
         // 1. 获取当前武器名称
         const currentName = this.getWeaponName(this.currentWeapon);
-        
+
         // 2. 显示更详细的信息：金币 + 当前装备 + 所有库存
         this.infoText.setText(
             `💰 金币: ${d.coins}\n` +
-            `✋ 当前装备: [ ${currentName} ]\n` + 
+            `✋ 当前装备: [ ${currentName} ]\n` +
             `----------------\n` +
             `📦 库存:\n` +
             `   🏹 弓箭: ${d.ammo.bow}\n` +
@@ -247,13 +341,13 @@ class ShooterScene extends Phaser.Scene {
 
         // 刷新商店按钮的状态（可选）
         this.checkBalance();
-        
+
         // 更新切换按钮的颜色（视觉反馈）
         this.updateSwitchButtons();
     }
 
     getWeaponName(key) {
-        const map = { 'bow': '弓', 'gun': '枪',  'sock': '臭袜' };
+        const map = { 'bow': '弓', 'gun': '枪', 'sock': '臭袜' };
         return map[key];
     }
 
@@ -263,15 +357,15 @@ class ShooterScene extends Phaser.Scene {
         if (DataManager.data.coins < 10) {
             // 没钱时：召唤按钮变灰，不可点击
             this.spawnBtn.setBackgroundColor('#555');
-            this.spawnBtn.setText(' 金币不足 (需10) ');
-            this.spawnBtn.disableInteractive(); 
+            this.spawnBtn.setText(' ⚡金币不足 '); // 文字要简短，适应顶部空间
+            this.spawnBtn.disableInteractive();
         } else {
             // 有钱时：恢复绿色，可以点击
             this.spawnBtn.setBackgroundColor('#00aa00');
-            this.spawnBtn.setText(' 召唤猎物 (-10金币) ');
+            this.spawnBtn.setText(' ⚡召唤(-10) '); // 恢复正常文字
             this.spawnBtn.setInteractive();
         }
-        
+
         // 注意：这里不再操作 adBtn 了，因为那个按钮已经被我们删了
     }
 
@@ -298,7 +392,7 @@ class ShooterScene extends Phaser.Scene {
     spawnSingleTarget() {
         const W = this.scale.width;
         const H = this.scale.height;
-        
+
         // 1. 随机逻辑 (保持不变)
         let rand = Math.random();
         let type = 'bird';
@@ -307,24 +401,24 @@ class ShooterScene extends Phaser.Scene {
         else if (rand < 0.6) type = 'ammo_box';
 
         let config = {
-            'plane':    { yMin: 0.1, yMax: 0.2, scale: 0.6, speed: 300, color: 0xffff00 }, 
-            'bomb':     { yMin: 0.2, yMax: 0.7, scale: 0.9, speed: 150, color: 0x000000 }, 
+            'plane': { yMin: 0.1, yMax: 0.2, scale: 0.6, speed: 300, color: 0xffff00 },
+            'bomb': { yMin: 0.2, yMax: 0.7, scale: 0.9, speed: 150, color: 0x000000 },
             'ammo_box': { yMin: 0.3, yMax: 0.5, scale: 0.8, speed: 150, color: 0x00ffff },
-            'bird':     { yMin: 0.5, yMax: 0.8, scale: 1.0, speed: 100, color: 0xff0000 }
+            'bird': { yMin: 0.5, yMax: 0.8, scale: 1.0, speed: 100, color: 0xff0000 }
         }[type];
 
         let y = Phaser.Math.Between(H * config.yMin, H * config.yMax);
-        
+
         // --- 调试日志：按 F12 看 Console ---
         // 如果你看不到这个日志，说明 startWave 没执行
         // 如果 W 特别大(比如几千)，说明 scale 模式有问题
-        console.log(`生成怪: ${type} at x:${W + 50}, y:${y}`); 
+        console.log(`生成怪: ${type} at x:${W + 50}, y:${y}`);
 
         let target;
-        
+
         if (this.textures.exists(type)) {
             target = this.physics.add.sprite(W + 50, y, type);
-            target.setScale(config.scale); 
+            target.setScale(config.scale);
         } else {
             // --- 修正纯图形的物理生成 ---
             if (type === 'bomb') {
@@ -347,9 +441,11 @@ class ShooterScene extends Phaser.Scene {
         target.body.velocity.y = 0; // 确保Y轴不乱动
 
         // 3. 销毁逻辑
-        this.time.addEvent({ delay: 12000, callback: () => { 
-            if(target && target.active) target.destroy(); 
-        }});
+        this.time.addEvent({
+            delay: 12000, callback: () => {
+                if (target && target.active) target.destroy();
+            }
+        });
     }
 
     // --- 射击逻辑 (含 V1.2 连击准备) ---
@@ -367,13 +463,16 @@ class ShooterScene extends Phaser.Scene {
 
         // 获取参数
         const stats = this.getWeaponStats();
-        const startX = 150;
-        const startY = this.scale.height - 150;
+        // const startX = 150;
+        // const startY = this.scale.height - 150;
+
+        const startX = this.fireX;
+        const startY = this.fireY;
 
         // // 生成子弹
         // // 袜子的颜色设个粉色或者贴图
         // let bullet = this.add.rectangle(startX, startY, 20 * stats.size, 10 * stats.size, stats.color);
-        
+
         // // 如果是袜子，我们可以搞个简单的“旋转动画”模拟袜子在飞
         // if (this.currentWeapon === 'sock') {
         //     // 把矩形变得稍微不规则一点，像个袜子
@@ -383,25 +482,25 @@ class ShooterScene extends Phaser.Scene {
         // this.physics.add.existing(bullet);
 
         let bullet;
-    
-    // 定义不同武器对应的图片 Key (要和 preload 里加载的一致)
-    const textureMap = {
-        'bow': 'bullet_bow',
-        'gun': 'bullet_gun',
-        'sock': 'bullet_sock'
-    };
-    const imgKey = textureMap[this.currentWeapon];
 
-    // 检查是否加载了图片
-    if (this.textures.exists(imgKey)) {
-        // 使用图片
-        bullet = this.physics.add.sprite(startX, startY, imgKey);
-        bullet.setScale(stats.size); // 使用 stats 里的 size 控制图片缩放
-    } else {
-        // 如果没图片，还是用原来的方块代替（作为后备）
-        bullet = this.add.rectangle(startX, startY, 20 * stats.size, 10 * stats.size, stats.color);
-        this.physics.add.existing(bullet);
-    }
+        // 定义不同武器对应的图片 Key (要和 preload 里加载的一致)
+        const textureMap = {
+            'bow': 'bullet_bow',
+            'gun': 'bullet_gun',
+            'sock': 'bullet_sock'
+        };
+        const imgKey = textureMap[this.currentWeapon];
+
+        // 检查是否加载了图片
+        if (this.textures.exists(imgKey)) {
+            // 使用图片
+            bullet = this.physics.add.sprite(startX, startY, imgKey);
+            bullet.setScale(stats.size); // 使用 stats 里的 size 控制图片缩放
+        } else {
+            // 如果没图片，还是用原来的方块代替（作为后备）
+            bullet = this.add.rectangle(startX, startY, 20 * stats.size, 10 * stats.size, stats.color);
+            this.physics.add.existing(bullet);
+        }
         this.bullets.add(bullet);
 
         // 设置子弹属性
@@ -411,10 +510,10 @@ class ShooterScene extends Phaser.Scene {
 
         // --- 核心：根据角度设置速度 ---
         const angle = Phaser.Math.Angle.Between(startX, startY, pointer.x, pointer.y);
-        
+
         // 设置重力
         bullet.body.setGravityY(stats.gravity);
-        
+
         // 设置速度向量 (这样和我们的辅助线算法就完全一致了)
         bullet.body.setVelocity(
             Math.cos(angle) * stats.speed,
@@ -441,7 +540,7 @@ class ShooterScene extends Phaser.Scene {
         // 1. 检查这发子弹是否已经打过这个怪了（防止重叠时每帧都触发）
         // 虽然 target 马上会销毁，但为了逻辑严谨，防止 destroy 还没生效时的重复调用
         if (bullet.hitTargetIds.has(target)) return;
-        
+
         bullet.hitTargetIds.add(target);
         bullet.hitCount++;
 
@@ -454,10 +553,10 @@ class ShooterScene extends Phaser.Scene {
             DataManager.data.coins = Math.max(0, DataManager.data.coins - 20); // 扣20金币
             DataManager.save();
             this.updateUI();
-            
+
             // 炸弹会强制销毁所有类型的子弹（哪怕是无敌的鞋子）
-            bullet.destroy(); 
-            
+            bullet.destroy();
+
             // 特效：红色震动 + 扣分飘字
             this.cameras.main.shake(200, 0.02);
             this.showFloatingText(target.x, target.y, "-20金币!", '#ff0000', 50);
@@ -481,7 +580,7 @@ class ShooterScene extends Phaser.Scene {
         if (bullet.hitCount >= 2) {
             // 从第二个目标开始，每个额外 +5 金币
             DataManager.data.coins += 5;
-            msg = `连击! +5`; 
+            msg = `连击! +5`;
             color = '#00ff00'; // 绿色显示连击
             this.sound_play_combo(); // 假装这里有个音效
         }
@@ -495,7 +594,7 @@ class ShooterScene extends Phaser.Scene {
             bullet.destroy();
         }
     }
-    
+
     sound_play_combo() {
         // 预留音效接口
     }

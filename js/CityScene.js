@@ -3,9 +3,25 @@ class CityScene extends Phaser.Scene {
         super({ key: 'CityScene' });
     }
 
+    preload() {
+        // 在此加载图片素材
+        this.load.image('bg_img', 'assets/background.png'); 
+    }
+
     create() {
         const W = this.scale.width;
         const H = this.scale.height;
+
+        // === 【新增】添加背景图 ===
+    // 参数说明：x坐标, y坐标, 图片Key
+    let bg = this.add.image(W / 2, H / 2, 'bg_img');
+    
+    // 关键设置：
+    // 1. 铺满屏幕：强制把图片拉伸到和屏幕一样大
+    bg.setDisplaySize(W, H); 
+    
+    // 2. 层级调整：设置为 -1，确保它永远在所有物体(默认是0)的后面
+    bg.setDepth(-1); 
 
         // 1. 顶部金币
         this.coinText = this.add.text(30, 30, `💰 金币: ${Math.floor(DataManager.data.coins)}`, { fontSize: '32px', color: '#fff' });
